@@ -95,12 +95,13 @@ QMainWindow, QWidget#centralWidget {{
 
 /* ═══ Tooltips ═══ */
 QToolTip {{
-    background: {t['bg_layer3']};
-    color: {t['text_p']};
-    border: 1px solid {t['border_bright']};
+    background: #21212F;
+    color: #F0F0F8;
+    border: 1px solid rgba(255,184,0,0.5);
     border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
 }}
 
 /* ═══ Scrollbars — ultra-minimal ═══ */

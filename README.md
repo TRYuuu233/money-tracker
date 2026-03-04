@@ -11,6 +11,12 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](https://github.com/TRYuuu233/money-tracker/releases)
 [![Stars](https://img.shields.io/github/stars/TRYuuu233/money-tracker?style=social)](https://github.com/TRYuuu233/money-tracker)
 
+<div align="center">
+  <h3>🌍 Official Websites / 官方主页</h3>
+  <a href="https://TRYuuu233.github.io/money-tracker/"><b>English Website (GitHub Pages)</b></a> &nbsp;|&nbsp;
+  <a href="https://rainbow-cajeta-646fb8.netlify.app/"><b>中文引流官网 (Netlify)</b></a>
+</div>
+
 ---
 
 ## 🏆 Why This App Crushes Every Other Finance Tracker / 为什么选它

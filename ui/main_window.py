@@ -599,9 +599,9 @@ class ModuleContentPanel(QWidget):
         label = "\u2191 升序" if is_asc else "\u2193 降序"
         self.btn_sort_dir.setText(label)
         if is_asc:
-            bg     = f"{self.theme['accent']}20"
-            border = f"{self.theme['accent']}55"
-            color  = self.theme['accent']
+            bg     = self.theme['bg_layer3']
+            border = self.theme['border']
+            color  = self.theme['text_s']
         else:
             bg     = self.theme['bg_layer3']
             border = self.theme['border']
@@ -1644,9 +1644,9 @@ class MainWindow(QMainWindow):
         t = self.theme
         is_desc = getattr(self, '_sidebar_sort_desc', True)
         label  = "↓ 降序" if is_desc else "↑ 升序"
-        bg     = t['bg_layer3'] if is_desc else f"{t['accent']}20"
-        border = t['border']    if is_desc else f"{t['accent']}55"
-        color  = t['text_s']    if is_desc else t['accent']
+        bg     = t['bg_layer3']
+        border = t['border']
+        color  = t['text_s']
         self.sidebar_sort_btn.setText(label)
         self.sidebar_sort_btn.setStyleSheet(f"""
             QPushButton {{
