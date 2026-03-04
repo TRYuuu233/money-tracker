@@ -58,27 +58,6 @@ class SettingsDialog(QDialog):
         title.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {t['text_p']}; background: transparent;")
         title_row.addWidget(title)
         title_row.addStretch()
-        btn_close = QPushButton("\u00D7")
-        btn_close.setFixedSize(34, 34)
-        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_close.setStyleSheet("""
-            QPushButton {
-                background: #C0392B;
-                color: #FFFFFF;
-                border: none;
-                border-radius: 10px;
-                font-size: 20px; font-weight: 900;
-                font-family: 'Segoe UI', 'Arial', sans-serif;
-            }
-            QPushButton:hover {
-                background: #E74C3C;
-            }
-            QPushButton:pressed {
-                background: #A93226;
-            }
-        """)
-        btn_close.clicked.connect(self.reject)
-        title_row.addWidget(btn_close)
         layout.addLayout(title_row)
 
         # ── Divider ────────────────────────────────────────────

@@ -8,12 +8,58 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QComboBox, QPushButton, QFrame
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QDoubleValidator
 
 from .styles import INCOME_SOURCES, EXPENSE_SOURCES, THEME
 from .effects import shake_widget
 from common.locale import L
+from PyQt6.QtCore import pyqtSignal
+
+
+class _CloseButton(QFrame):
+    """Reliable × close button using Python-driven hover (avoids CSS :hover rendering bug)."""
+    clicked = pyqtSignal()
+
+    _BG_NORM  = "#C0392B"
+    _BG_HOVER = "#E74C3C"
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(34, 34)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._lbl = QLabel("✕")
+        self._lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(self._lbl)
+        self._set_hover(False)
+
+    def _set_hover(self, hovered: bool):
+        bg = self._BG_HOVER if hovered else self._BG_NORM
+        self.setStyleSheet(f"""
+            QFrame {{
+                background: {bg};
+                border-radius: 10px;
+            }}
+        """)
+        self._lbl.setStyleSheet(
+            "font-size: 18px; font-weight: 900; color: #FFFFFF;"
+            " background: transparent; border: none;"
+        )
+
+    def enterEvent(self, event):
+        self._set_hover(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._set_hover(False)
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class TransactionDialog(QDialog):
@@ -97,26 +143,8 @@ class TransactionDialog(QDialog):
         header.addLayout(title_stack)
         header.addStretch()
 
-        # Close button — solid red background, white × text
-        close_btn = QPushButton("\u00D7")
-        close_btn.setFixedSize(34, 34)
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background: #C0392B;
-                color: #FFFFFF;
-                border: none;
-                border-radius: 10px;
-                font-size: 20px; font-weight: 900;
-                font-family: 'Segoe UI', 'Arial', sans-serif;
-            }
-            QPushButton:hover {
-                background: #E74C3C;
-            }
-            QPushButton:pressed {
-                background: #A93226;
-            }
-        """)
+        # Close button — Python-driven hover (avoids CSS :hover rendering bug on Windows)
+        close_btn = _CloseButton(parent=self)
         close_btn.clicked.connect(self.reject)
         header.addWidget(close_btn)
         layout.addLayout(header)

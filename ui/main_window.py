@@ -21,6 +21,7 @@ from .module_dialog import ModuleDialog
 from .settings_dialog import SettingsDialog
 from .summary_panel import SummaryPanel
 from common.database import Database
+from common.locale import L
 
 import csv
 import os
@@ -273,9 +274,13 @@ class TransactionItemWidget(QWidget):
             font-size: 16px; font-weight: 800; color: {accent}; 
             letter-spacing: 0.5px; background: transparent;
         """)
-        # Always show exact full value on hover (important for amounts >= 10,000)
-        lbl_amount.setToolTip(f"{sign}¥{exact_str}")
-        lbl_amount.setToolTipDuration(6000)
+        # Tooltip shows exact value on hover — set both on label AND card frame
+        tooltip_text = f"{sign}¥{exact_str}  ({'收入' if self.is_income else '支出'})"
+        lbl_amount.setToolTip(tooltip_text)
+        lbl_amount.setToolTipDuration(8000)
+        # Also set on the card frame so any hover on the card reveals it
+        self.card_frame.setToolTip(tooltip_text)
+        self.setToolTip(tooltip_text)
         
         lbl_currency = QLabel("元")
         lbl_currency.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -488,16 +493,27 @@ class ModuleContentPanel(QWidget):
         layout.addLayout(action_bar)
         
         # ── Filter + Sort Control Bar ──────────────────────────────
-        ctrl_bar = QHBoxLayout()
-        ctrl_bar.setContentsMargins(2, 0, 2, 0)
-        ctrl_bar.setSpacing(7)
+        ctrl_frame = QFrame()
+        ctrl_frame.setObjectName("ctrlBar")
+        ctrl_frame.setStyleSheet(f"""
+            QFrame#ctrlBar {{
+                background: {self.theme['bg_layer2']};
+                border: 1px solid {self.theme['border']};
+                border-radius: 14px;
+                padding: 0px;
+            }}
+        """)
+        ctrl_bar = QHBoxLayout(ctrl_frame)
+        ctrl_bar.setContentsMargins(10, 6, 10, 6)
+        ctrl_bar.setSpacing(6)
+
+        # Type filter label
+        filter_lbl = QLabel("筛选")
+        filter_lbl.setStyleSheet(f"font-size: 11px; font-weight: 700; color: {self.theme['text_t']}; background: transparent; letter-spacing: 1px;")
+        ctrl_bar.addWidget(filter_lbl)
 
         # Type filter pills ── 全部 / 收入↗ / 支出↙
         from PyQt6.QtWidgets import QComboBox
-
-        filter_lbl = QLabel("筛选:")
-        filter_lbl.setStyleSheet(f"font-size: 12px; color: {self.theme['text_t']}; background: transparent;")
-        ctrl_bar.addWidget(filter_lbl)
 
         self.filter_btn_all     = QPushButton("全部")
         self.filter_btn_income  = QPushButton("收入 ↗")
@@ -508,7 +524,7 @@ class ModuleContentPanel(QWidget):
             "expense": self.filter_btn_expense,
         }
         for key, btn in self._filter_btns.items():
-            btn.setFixedHeight(30)
+            btn.setFixedHeight(32)
             btn.setCheckable(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             ctrl_bar.addWidget(btn)
@@ -518,23 +534,23 @@ class ModuleContentPanel(QWidget):
         # Thin separator
         sep = QFrame()
         sep.setFixedWidth(1)
-        sep.setFixedHeight(18)
-        sep.setStyleSheet(f"background: {self.theme['border']}; border: none;")
+        sep.setFixedHeight(20)
+        sep.setStyleSheet(f"background: {self.theme['border_bright']}; border: none;")
         ctrl_bar.addWidget(sep)
 
         # Sort section
-        sort_lbl = QLabel("排序:")
-        sort_lbl.setStyleSheet(f"font-size: 12px; color: {self.theme['text_t']}; background: transparent;")
+        sort_lbl = QLabel("排序")
+        sort_lbl.setStyleSheet(f"font-size: 11px; font-weight: 700; color: {self.theme['text_t']}; background: transparent; letter-spacing: 1px;")
         ctrl_bar.addWidget(sort_lbl)
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItems(["按日期", "按金额"])
-        self.sort_combo.setFixedHeight(30)
-        self.sort_combo.setFixedWidth(88)
+        self.sort_combo.setFixedHeight(32)
+        self.sort_combo.setFixedWidth(86)
         self.sort_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sort_combo.setStyleSheet(f"""
             QComboBox {{
-                background: {self.theme['bg_layer2']};
+                background: {self.theme['bg_layer3']};
                 border: 1px solid {self.theme['border']};
                 border-radius: 8px;
                 padding: 0 10px;
@@ -557,17 +573,17 @@ class ModuleContentPanel(QWidget):
         self.sort_combo.currentIndexChanged.connect(lambda _: self._apply_sort())
         ctrl_bar.addWidget(self.sort_combo)
 
-        self.btn_sort_dir = QPushButton("降序 ↓")
-        self.btn_sort_dir.setFixedSize(74, 30)
+        self.btn_sort_dir = QPushButton()
+        self.btn_sort_dir.setFixedSize(72, 32)
         self.btn_sort_dir.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_sort_dir.setCheckable(True)
-        self.btn_sort_dir.setChecked(False)  # False = descending (default)
-        self._update_sort_btn_style(False)
+        self.btn_sort_dir.setCheckable(False)
+        self._sort_desc = True  # starts descending
+        self._update_sort_btn_style(False)  # is_asc=False i.e. desc
         self.btn_sort_dir.clicked.connect(self._toggle_sort_dir)
         ctrl_bar.addWidget(self.btn_sort_dir)
 
         ctrl_bar.addStretch()
-        layout.addLayout(ctrl_bar)
+        layout.addWidget(ctrl_frame)
 
         # ── Smooth Transaction List ────────────────────────
         self.trans_list = SmoothListWidget()
@@ -579,18 +595,18 @@ class ModuleContentPanel(QWidget):
 
 
     def _update_sort_btn_style(self, is_asc: bool):
-        """Style the sort-direction button to reflect current direction."""
-        if is_asc:
-            label = "升序 ↑"
-            bg = f"{self.theme['accent']}22"
-            border = f"{self.theme['accent']}66"
-            color = self.theme['accent']
-        else:
-            label = "降序 ↓"
-            bg = self.theme['bg_layer2']
-            border = self.theme['border']
-            color = self.theme['text_s']
+        """Style the sort-direction button (Python-driven, no CSS :hover to avoid activation-color bug)."""
+        label = "\u2191 升序" if is_asc else "\u2193 降序"
         self.btn_sort_dir.setText(label)
+        if is_asc:
+            bg     = f"{self.theme['accent']}20"
+            border = f"{self.theme['accent']}55"
+            color  = self.theme['accent']
+        else:
+            bg     = self.theme['bg_layer3']
+            border = self.theme['border']
+            color  = self.theme['text_s']
+        # Use only a plain (non-:hover) stylesheet so QPushButton never auto-overrides it
         self.btn_sort_dir.setStyleSheet(f"""
             QPushButton {{
                 background: {bg};
@@ -599,12 +615,30 @@ class ModuleContentPanel(QWidget):
                 font-size: 12px; font-weight: 700;
                 color: {color};
             }}
-            QPushButton:hover {{
-                background: {self.theme['bg_layer3']};
-                border-color: {self.theme['border_bright']};
-                color: {self.theme['text_p']};
-            }}
         """)
+        # Manually wire hover via events (re-applied on each call to avoid stale closures)
+        _bg_h = self.theme['bg_layer3']
+        _bd_h = self.theme['border_bright']
+        _col_h = self.theme['text_p']
+        def _enter(event, _bg=bg, _bd=border, _col=color, btn=self.btn_sort_dir,
+                   bg_h=_bg_h, bd_h=_bd_h, col_h=_col_h, lbl=label):
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {bg_h}; border: 1px solid {bd_h};
+                    border-radius: 8px; font-size: 12px; font-weight: 700; color: {col_h};
+                }}
+            """)
+            super(type(btn), btn).enterEvent(event)
+        def _leave(event, _bg=bg, _bd=border, _col=color, btn=self.btn_sort_dir, lbl=label):
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {_bg}; border: 1px solid {_bd};
+                    border-radius: 8px; font-size: 12px; font-weight: 700; color: {_col};
+                }}
+            """)
+            super(type(btn), btn).leaveEvent(event)
+        self.btn_sort_dir.enterEvent = _enter
+        self.btn_sort_dir.leaveEvent = _leave
 
     def _toggle_sort_dir(self):
         """Toggle asc/desc, update button, and re-render."""
@@ -1215,7 +1249,7 @@ class MainWindow(QMainWindow):
         from .styles import THEME, MAIN_STYLESHEET
         self.theme = THEME
         
-        self.setWindowTitle("Money Tracker Pro - Premium Edition")
+        self.setWindowTitle("Lumis 记账管家 Pro")
         self.resize(1080, 720)
         self.setMinimumSize(900, 600)
         self.setStyleSheet(MAIN_STYLESHEET)
@@ -1408,21 +1442,25 @@ class MainWindow(QMainWindow):
         logo_layout.setContentsMargins(28, 40, 24, 20)
         logo_layout.setSpacing(12)
         
-        logo = QLabel("∞")
+        logo = QLabel("✦")
         logo.setStyleSheet(f"""
-            font-size: 38px; font-weight: 900; 
+            font-size: 34px; font-weight: 900;
             color: {self.theme['accent']};
             background: transparent; border: none;
         """)
         
         brand_vbox = QVBoxLayout()
-        brand_vbox.setSpacing(0)
+        brand_vbox.setSpacing(2)
         brand_vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         
-        brand_main = QLabel("智能财务")
-        brand_main.setStyleSheet(f"font-size: 20px; font-weight: 900; color: {self.theme['text_p']}; letter-spacing: 2px;")
-        brand_sub = QLabel("记账管家专业版")
-        brand_sub.setStyleSheet(f"font-size: 10px; font-weight: 700; color: {self.theme['accent']}; letter-spacing: 2px;")
+        brand_main = QLabel("Lumis")
+        brand_main.setStyleSheet(
+            f"font-size: 22px; font-weight: 900; letter-spacing: 3px;"
+            f" background: transparent;"
+            f" color: {self.theme['text_p']};"
+        )
+        brand_sub = QLabel("记账管家 Pro")
+        brand_sub.setStyleSheet(f"font-size: 10px; font-weight: 700; color: {self.theme['accent']}; letter-spacing: 2px; background: transparent;")
         
         brand_vbox.addWidget(brand_main)
         brand_vbox.addWidget(brand_sub)
@@ -1435,8 +1473,8 @@ class MainWindow(QMainWindow):
         # Header for lists
         nav_header = QHBoxLayout()
         nav_header.setContentsMargins(28, 10, 20, 10)
-        lbl_ledgers = QLabel("账本列表")
-        lbl_ledgers.setStyleSheet("font-size: 11px; font-weight: 700; color: #8A8A9E; letter-spacing: 1px;")
+        lbl_ledgers = QLabel(L("ledger_list"))
+        lbl_ledgers.setStyleSheet("font-size: 11px; font-weight: 700; color: #8A8A9E; letter-spacing: 1px; background: transparent;")
         nav_header.addWidget(lbl_ledgers)
         nav_header.addStretch()
         layout.addLayout(nav_header)
@@ -1445,14 +1483,18 @@ class MainWindow(QMainWindow):
         from PyQt6.QtWidgets import QComboBox
         sort_row = QHBoxLayout()
         sort_row.setContentsMargins(16, 2, 16, 4)
+        sort_row.setSpacing(6)
 
-        sort_lbl = QLabel("排序：")
-        sort_lbl.setStyleSheet(f"font-size:12px; color:{self.theme['text_t']}; background:transparent;")
+        sort_lbl = QLabel("排序")
+        sort_lbl.setStyleSheet(f"font-size:11px; font-weight:700; color:{self.theme['text_t']}; background:transparent; letter-spacing:1px;")
         sort_row.addWidget(sort_lbl)
 
-        self.sort_combo = QComboBox()
-        self.sort_combo.addItems(["余额从大到小", "余额从小到大", "创建时间", "最近动态"])
-        self.sort_combo.setStyleSheet(f"""
+        # Sort type combo — 5 dimensions
+        self.sidebar_sort_combo = QComboBox()
+        self.sidebar_sort_combo.addItems(["余额", "修改日期", "创建时间", "收入", "支出"])
+        self.sidebar_sort_combo.setFixedHeight(30)
+        self.sidebar_sort_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sidebar_sort_combo.setStyleSheet(f"""
             QComboBox {{
                 background: {self.theme['bg_layer2']};
                 color: {self.theme['text_s']};
@@ -1460,6 +1502,10 @@ class MainWindow(QMainWindow):
                 border-radius: 8px;
                 padding: 3px 10px;
                 font-size: 12px;
+            }}
+            QComboBox:hover {{
+                border-color: {self.theme['border_bright']};
+                color: {self.theme['text_p']};
             }}
             QComboBox::drop-down {{ border: none; width: 18px; }}
             QComboBox QAbstractItemView {{
@@ -1469,21 +1515,36 @@ class MainWindow(QMainWindow):
                 selection-background-color: {self.theme['accent']}33;
             }}
         """)
-        _SORT_KEYS = ["balance_desc", "balance_asc", "created_desc", "updated_desc"]
-        def _on_sort_changed(idx):
+
+        # Sidebar sort direction toggle button (Python hover)
+        self._sidebar_sort_desc = True  # default: descending
+        self.sidebar_sort_btn = QPushButton("↓ 降序")
+        self.sidebar_sort_btn.setFixedSize(68, 30)
+        self.sidebar_sort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._apply_sidebar_sort_btn_style()
+
+        def _refresh_sidebar_sort(*_):
             prev_mid = None
             cur = self.module_list.currentItem()
             if cur:
                 prev_mid = cur.data(Qt.ItemDataRole.UserRole)[0]
-            self._load_modules(_SORT_KEYS[idx])
-            # Restore previous selection if still present
+            self._load_modules()  # uses self._sidebar_sort_desc + combo
             if prev_mid:
                 for i in range(self.module_list.count()):
                     if self.module_list.item(i).data(Qt.ItemDataRole.UserRole)[0] == prev_mid:
                         self.module_list.setCurrentRow(i)
                         break
-        self.sort_combo.currentIndexChanged.connect(_on_sort_changed)
-        sort_row.addWidget(self.sort_combo, 1)
+
+        def _toggle_sidebar_sort():
+            self._sidebar_sort_desc = not self._sidebar_sort_desc
+            self._apply_sidebar_sort_btn_style()
+            _refresh_sidebar_sort()
+
+        self.sidebar_sort_combo.currentIndexChanged.connect(_refresh_sidebar_sort)
+        self.sidebar_sort_btn.clicked.connect(_toggle_sidebar_sort)
+
+        sort_row.addWidget(self.sidebar_sort_combo, 1)
+        sort_row.addWidget(self.sidebar_sort_btn)
         layout.addLayout(sort_row)
         
         # List of ledgers
@@ -1578,19 +1639,57 @@ class MainWindow(QMainWindow):
         layout.addWidget(div)
         layout.addWidget(bottom_area)
 
-    def _load_modules(self, sort_by: str = None):
-        # Persist sort choice across reloads
-        if sort_by is not None:
-            self._current_sort = sort_by
-        sort = getattr(self, '_current_sort', 'balance_desc')
+    def _apply_sidebar_sort_btn_style(self):
+        """Apply Python-driven style to sidebar asc/desc toggle button."""
+        t = self.theme
+        is_desc = getattr(self, '_sidebar_sort_desc', True)
+        label  = "↓ 降序" if is_desc else "↑ 升序"
+        bg     = t['bg_layer3'] if is_desc else f"{t['accent']}20"
+        border = t['border']    if is_desc else f"{t['accent']}55"
+        color  = t['text_s']    if is_desc else t['accent']
+        self.sidebar_sort_btn.setText(label)
+        self.sidebar_sort_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {bg};
+                border: 1px solid {border};
+                border-radius: 8px;
+                font-size: 12px; font-weight: 700;
+                color: {color};
+            }}
+        """)
+        # Python-driven hover
+        _bg_h  = t['bg_layer2']
+        _bd_h  = t['border_bright']
+        _col_h = t['text_p']
+        def _enter(ev, _bg=bg, _bd=border, _col=color, btn=self.sidebar_sort_btn,
+                   bg_h=_bg_h, bd_h=_bd_h, col_h=_col_h):
+            btn.setStyleSheet(f"QPushButton {{ background:{bg_h}; border:1px solid {bd_h}; border-radius:8px; font-size:12px; font-weight:700; color:{col_h}; }}")
+            super(type(btn), btn).enterEvent(ev)
+        def _leave(ev, _bg=bg, _bd=border, _col=color, btn=self.sidebar_sort_btn):
+            btn.setStyleSheet(f"QPushButton {{ background:{_bg}; border:1px solid {_bd}; border-radius:8px; font-size:12px; font-weight:700; color:{_col}; }}")
+            super(type(btn), btn).leaveEvent(ev)
+        self.sidebar_sort_btn.enterEvent = _enter
+        self.sidebar_sort_btn.leaveEvent = _leave
 
-        if sort == 'balance_asc':
-            module_list = self.db.get_modules_sorted_by_balance_asc()
-        elif sort == 'created_desc':
-            module_list = self.db.get_modules_sorted_by_created()
-        elif sort == 'updated_desc':
-            module_list = self.db.get_modules_sorted_by_updated()
-        else:  # default: balance_desc
+    def _load_modules(self, sort_by: str = None):
+        """Load ledger list using sidebar sort combo + asc/desc toggle."""
+        # Derive sort key from sidebar combo idx + direction toggle
+        desc = getattr(self, '_sidebar_sort_desc', True)
+        idx  = getattr(self, 'sidebar_sort_combo', None)
+        combo_idx = idx.currentIndex() if idx else 0
+
+        # Map combo index to sort dimension: 0=余额 1=修改日期 2=创建时间 3=收入 4=支出
+        if combo_idx == 0:    # 余额
+            module_list = self.db.get_modules_sorted_by_balance() if desc else self.db.get_modules_sorted_by_balance_asc()
+        elif combo_idx == 1:  # 修改日期
+            module_list = self.db.get_modules_sorted_by_updated() if desc else self.db.get_modules_sorted_by_updated_asc()
+        elif combo_idx == 2:  # 创建时间
+            module_list = self.db.get_modules_sorted_by_created() if desc else self.db.get_modules_sorted_by_created_asc()
+        elif combo_idx == 3:  # 收入
+            module_list = self.db.get_modules_sorted_by_income_desc() if desc else self.db.get_modules_sorted_by_income_asc()
+        elif combo_idx == 4:  # 支出
+            module_list = self.db.get_modules_sorted_by_expense_desc() if desc else self.db.get_modules_sorted_by_expense_asc()
+        else:
             module_list = self.db.get_modules_sorted_by_balance()
 
         self.module_list.clear()
@@ -1782,29 +1881,19 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def _trigger_income(self):
-        if hasattr(self, 'module_panel') and self.content_stack.currentWidget() == self.module_panel:
-            self.module_panel._add_transaction("income")
-        else:
-            if not self.module_list.count(): return
-            item = self.module_list.item(0)
-            mid, name, icon, color = item.data(Qt.ItemDataRole.UserRole)
-            from .transaction_dialog import TransactionDialog
-            dialog = TransactionDialog("income", name, self)
-            if dialog.exec():
-                amt, src = dialog.get_result()
-                self.db.add_transaction(amt, "income", src, mid)
-                self._load_modules()
+        """Global keyboard shortcut: always switch to module panel and open income dialog."""
+        if not hasattr(self, 'module_panel') or self.module_panel.module_id is None:
+            return  # no ledger selected yet
+        # Switch to ledger panel if not already visible
+        if self.content_stack.currentWidget() != self.module_panel:
+            self.content_stack.setCurrentWidget(self.module_panel)
+        self.module_panel._add_transaction("income")
 
     def _trigger_expense(self):
-        if hasattr(self, 'module_panel') and self.content_stack.currentWidget() == self.module_panel:
-            self.module_panel._add_transaction("expense")
-        else:
-            if not self.module_list.count(): return
-            item = self.module_list.item(0)
-            mid, name, icon, color = item.data(Qt.ItemDataRole.UserRole)
-            from .transaction_dialog import TransactionDialog
-            dialog = TransactionDialog("expense", name, self)
-            if dialog.exec():
-                amt, src = dialog.get_result()
-                self.db.add_transaction(amt, "expense", src, mid)
-                self._load_modules()
+        """Global keyboard shortcut: always switch to module panel and open expense dialog."""
+        if not hasattr(self, 'module_panel') or self.module_panel.module_id is None:
+            return  # no ledger selected yet
+        # Switch to ledger panel if not already visible
+        if self.content_stack.currentWidget() != self.module_panel:
+            self.content_stack.setCurrentWidget(self.module_panel)
+        self.module_panel._add_transaction("expense")

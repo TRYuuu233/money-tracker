@@ -220,6 +220,78 @@ class Database:
             ORDER BY MAX(t.created_at) DESC NULLS LAST, m.id DESC
         ''')
         return self.cursor.fetchall()
+
+    def get_modules_sorted_by_updated_asc(self) -> list:
+        """获取按最早交易时间排序的模块（最早有动态在前）"""
+        self.cursor.execute('''
+            SELECT m.id, m.name, m.icon, m.color,
+                   COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END), 0) as balance
+            FROM modules m
+            LEFT JOIN transactions t ON m.id = t.module_id
+            GROUP BY m.id
+            ORDER BY MAX(t.created_at) ASC NULLS LAST, m.id ASC
+        ''')
+        return self.cursor.fetchall()
+
+    def get_modules_sorted_by_created_asc(self) -> list:
+        """获取按创建时间升序排列的模块（最早创建在前）"""
+        self.cursor.execute('''
+            SELECT m.id, m.name, m.icon, m.color,
+                   COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END), 0) as balance
+            FROM modules m
+            LEFT JOIN transactions t ON m.id = t.module_id
+            GROUP BY m.id
+            ORDER BY m.id ASC
+        ''')
+        return self.cursor.fetchall()
+
+    def get_modules_sorted_by_income_desc(self) -> list:
+        """获取按收入从大到小排序的模块"""
+        self.cursor.execute('''
+            SELECT m.id, m.name, m.icon, m.color,
+                   COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END), 0) as balance
+            FROM modules m
+            LEFT JOIN transactions t ON m.id = t.module_id
+            GROUP BY m.id
+            ORDER BY COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE 0 END), 0) DESC
+        ''')
+        return self.cursor.fetchall()
+
+    def get_modules_sorted_by_income_asc(self) -> list:
+        """获取按收入从小到大排序的模块"""
+        self.cursor.execute('''
+            SELECT m.id, m.name, m.icon, m.color,
+                   COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END), 0) as balance
+            FROM modules m
+            LEFT JOIN transactions t ON m.id = t.module_id
+            GROUP BY m.id
+            ORDER BY COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE 0 END), 0) ASC
+        ''')
+        return self.cursor.fetchall()
+
+    def get_modules_sorted_by_expense_desc(self) -> list:
+        """获取按支出从大到小排序的模块"""
+        self.cursor.execute('''
+            SELECT m.id, m.name, m.icon, m.color,
+                   COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END), 0) as balance
+            FROM modules m
+            LEFT JOIN transactions t ON m.id = t.module_id
+            GROUP BY m.id
+            ORDER BY COALESCE(SUM(CASE WHEN t.type='expense' THEN t.amount ELSE 0 END), 0) DESC
+        ''')
+        return self.cursor.fetchall()
+
+    def get_modules_sorted_by_expense_asc(self) -> list:
+        """获取按支出从小到大排序的模块"""
+        self.cursor.execute('''
+            SELECT m.id, m.name, m.icon, m.color,
+                   COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount ELSE -t.amount END), 0) as balance
+            FROM modules m
+            LEFT JOIN transactions t ON m.id = t.module_id
+            GROUP BY m.id
+            ORDER BY COALESCE(SUM(CASE WHEN t.type='expense' THEN t.amount ELSE 0 END), 0) ASC
+        ''')
+        return self.cursor.fetchall()
     
     # ============ 交易管理 ============
     
